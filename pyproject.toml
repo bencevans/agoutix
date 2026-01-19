@@ -1,0 +1,29 @@
+[project]
+name = "agouti-annotation-exporter"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Ben Evans", email = "Benjamin.Evans@ioz.ac.uk" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.12.5",
+    "requests>=2.32.5",
+    "rich>=14.2.0",
+    "tqdm>=4.67.1",
+]
+
+[project.scripts]
+agouti-annotation-exporter = "agouti_annotation_exporter:main"
+aae = "agouti_annotation_exporter:main"
+
+[build-system]
+requires = ["uv_build>=0.9.26,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.1.0",
+    "matplotlib>=3.10.8",
+]
