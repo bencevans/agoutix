@@ -1,5 +1,5 @@
 [project]
-name = "agouti-annotation-exporter"
+name = "agoutix"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "furl>=2.1.4",
     "pydantic>=2.12.5",
     "requests>=2.32.5",
     "rich>=14.2.0",
@@ -15,8 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-agouti-annotation-exporter = "agouti_annotation_exporter:main"
-aae = "agouti_annotation_exporter:main"
+agoutix = "agoutix:main"
 
 [build-system]
 requires = ["uv_build>=0.9.26,<0.10.0"]
@@ -26,4 +26,5 @@ build-backend = "uv_build"
 dev = [
     "ipykernel>=7.1.0",
     "matplotlib>=3.10.8",
+    "pytest>=9.0.2",
 ]
