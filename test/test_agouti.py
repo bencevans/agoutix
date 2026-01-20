@@ -71,8 +71,15 @@ def test_list_deployment_calibrations() -> None:
     assert len(calibrations) >= 0  # Calibrations may be zero
 
 
-def test_download_asset() -> None:
+def test_get_asset() -> None:
     agouti = Agouti(AGOUTI_EMAIL, AGOUTI_PASSWORD)
-    content, filename = agouti.download_asset(AGOUTI_ASSET_ID)
+    asset = agouti.get_asset(AGOUTI_ASSET_ID)
+    assert asset.id == AGOUTI_ASSET_ID
+    assert asset.attributes.filename == AGOUTI_ASSET_FILENAME
+
+
+def test_get_asset_file() -> None:
+    agouti = Agouti(AGOUTI_EMAIL, AGOUTI_PASSWORD)
+    content, filename = agouti.get_asset_file(AGOUTI_ASSET_ID)
     assert len(content) > 0
     assert filename == AGOUTI_ASSET_FILENAME

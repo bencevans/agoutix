@@ -105,6 +105,33 @@ class ObservationPosition(BaseModel):
     attributes: Attributes
 
 
+class Asset(BaseModel):
+    class Attributes(BaseModel):
+        sequence: str
+        type: Literal["image", "video"]
+        filename: str
+        original_filename: str = Field(alias="original-filename")
+        destination: str
+        directory: str
+        order: int
+        created_at: str = Field(alias="created-at")
+        is_favorite: Optional[bool] = Field(alias="is-favorite", default=None)
+        deployment: str
+        width: int
+        height: int
+        camera_make: str = Field(alias="camera-make")
+        camera_model: str = Field(alias="camera-model")
+        mime_type: str = Field(alias="mime-type")
+        camera_serial_number: Optional[str] = Field(
+            alias="camera-serial-number", default=None
+        )
+        is_time_lapse: Optional[bool] = Field(alias="is-time-lapse", default=None)
+
+    type: Literal["assets"]
+    id: str
+    attributes: Attributes
+
+
 # ============================================================================
 # API Response Models
 # ============================================================================
@@ -134,7 +161,7 @@ class ApiResponse(BaseModel, Generic[DataType]):
 
     meta: Optional[Meta] = None
     links: Optional[Links] = None
-    data: List[DataType]
+    data: DataType | List[DataType]
     jsonapi: JsonApiDetails
 
 
@@ -156,6 +183,10 @@ class DeploymentCalibrationsResponse(ApiResponse[DeploymentCalibration]):
 
 
 class ObservationPositionsResponse(ApiResponse[ObservationPosition]):
+    pass
+
+
+class AssetsResponse(ApiResponse[Asset]):
     pass
 
 
@@ -277,7 +308,15 @@ class Agouti:
         response = self._make_request(url, ObservationPositionsResponse)
         return response.data
 
-    def download_asset(self, asset_id: str) -> tuple[bytes, str]:
+    def get_asset(self, asset_id: str) -> Asset:
+        """Get metadata for an asset."""
+        self._log(f"Fetching metadata for asset {asset_id}")
+        url = f"https://api.agouti.eu/assets/{asset_id}"
+        response: ApiResponse[Asset] = self._make_request(url, ApiResponse[Asset])
+        assert isinstance(response.data, Asset), "Expected single Asset, got list"
+        return response.data
+
+    def get_asset_file(self, asset_id: str) -> tuple[bytes, str]:
         """Download an asset file."""
         self._log(f"Downloading asset {asset_id}")
         url = f"https://api.agouti.eu/assets/{asset_id}/file"

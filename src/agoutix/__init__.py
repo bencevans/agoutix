@@ -1,7 +1,4 @@
-from pathlib import Path
-from rich import print
 from agoutix.agouti import Agouti
-from agoutix import cli
 
 
 def parse_args():
@@ -65,6 +62,10 @@ def parse_args():
 
 
 def main() -> None:
+    from pathlib import Path
+    from rich import print
+    from agoutix import cli
+
     args = parse_args()
 
     if not args.command:

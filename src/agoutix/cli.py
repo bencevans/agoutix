@@ -1,5 +1,6 @@
+import agoutix
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from rich import print
 from agoutix.agouti import Agouti
 from pydantic import BaseModel
@@ -47,7 +48,7 @@ def list_deployment_calibrations(agouti: Agouti, deployment_id: str) -> None:
 def download_asset(
     agouti: Agouti, asset_id: str, output_path: Optional[Path] = None
 ) -> None:
-    content, filename = agouti.download_asset(asset_id)
+    content, filename = agouti.get_asset_file(asset_id)
 
     if output_path is None:
         output_path = Path(filename)
@@ -101,15 +102,20 @@ def export_calibration_dataset(agouti: Agouti, project_ids: List[str]) -> None:
     for calibration in annotations:
         annotations_by_asset_id.setdefault(calibration.asset_id, []).append(calibration)
 
-    for asset_id in tqdm(asset_ids, desc="Downloading assets"):
-        content, filename = agouti.download_asset(asset_id)
-        asset_id_to_filename[asset_id] = filename
+    assets_by_id = {
+        asset_id: agouti.get_asset(asset_id)
+        for asset_id in tqdm(asset_ids, desc="Downloading assets")
+    }
+
+    # for asset_id in tqdm(asset_ids, desc="Downloading assets"):
+    #     content, filename = agouti.get_asset_file(asset_id)
+    #     asset_id_to_filename[asset_id] = filename
 
     calibration_dataset = CalibrationDataset(
         images=[
             CalibrationDataset.CalibrationDatasetImage(
                 asset_id=asset_id,
-                filename=asset_id_to_filename[asset_id],
+                filename=assets_by_id[asset_id].attributes.filename,
                 project_id=annotations[0].project_id,
                 deployment_id=annotations[0].deployment_id,
                 annotations=[
@@ -151,26 +157,138 @@ class CalibrationDataset(BaseModel):
     images: List[CalibrationDatasetImage]
 
 
+class ObservationDataset(BaseModel):
+    class Image(BaseModel):
+        file_name: str
+        asset_id: str
+        sequence_id: str
+        original_filename: str
+        created_at: str
+        deployment: str
+        project_id: str
+        width: int
+        height: int
+
+    class Observation(BaseModel):
+        observation_id: Optional[str]
+        scientific_name: Optional[str]
+        observation_type: str
+        sampling_point: str
+
+    class Position(BaseModel):
+        position_id: str
+        observation_id: str
+        asset_id: str
+        x: float
+        y: float
+
+    images: List[Image]
+    observations: List[Observation]
+    positions: List[Position]
+
+
 def export_observation_positions_dataset(
-    agouti: Agouti, project_id: str, output_file: str = "observation_positions.csv"
+    agouti: Agouti,
+    project_ids: List[str],
+    output_path: Optional[Path] = None,
 ) -> None:
-    print(f"Exporting observation positions dataset for project {project_id}")
-    observations = agouti.list_project_observations(
-        project_id, filter_observation_type="Species"
-    )
+    output_path = output_path or Path(".")
+
+    observations: List[Tuple[str, agoutix.agouti.Observation]] = []
+    for project_id in project_ids:
+        print(f"Exporting observation positions dataset for project {project_id}")
+        observations.extend(
+            [
+                (project_id, obs)
+                for obs in agouti.list_project_observations(
+                    project_id, filter_observation_type="Species"
+                )
+            ]
+        )
+
     print(f"Total observations found: {len(observations)}")
 
     # Enumerate Observation Positions
     observation_positions = [
-        agouti.list_observation_positions(obs.attributes.observation_id)
-        for obs in tqdm(observations, desc="Collecting observation positions")
+        (project_id, agouti.list_observation_positions(obs.attributes.observation_id))
+        for project_id, obs in tqdm(
+            observations, desc="Collecting observation positions"
+        )
         if obs.attributes.observation_type == "Species"
     ]
 
     observation_positions_flat = [
-        pos for sublist in observation_positions for pos in sublist
+        (project_id, pos)
+        for (project_id, positions) in observation_positions
+        for pos in positions
     ]
     print(f"Total observation positions found: {len(observation_positions_flat)}")
 
-    asset_ids = {pos.attributes.asset for pos in observation_positions_flat}
+    asset_ids = {
+        pos.attributes.asset for (project_id, pos) in observation_positions_flat
+    }
     print(f"Total unique assets to download: {len(asset_ids)}")
+
+    # Create assets directory
+    assets_dir_path = output_path / "assets"
+    assets_dir_path.mkdir(parents=True, exist_ok=True)
+
+    # Download assets
+    # asset_id_to_filename = {}
+    # for asset_id in tqdm(asset_ids, desc="Downloading assets"):
+    #     content, filename = agouti.get_asset_file(asset_id)
+    #     asset_id_to_filename[asset_id] = filename
+    #     asset_path = assets_dir_path / filename
+    #     with open(asset_path, "wb") as f:
+    #         f.write(content)
+
+    assets_by_id = {
+        asset_id: agouti.get_asset(asset_id)
+        for asset_id in tqdm(asset_ids, desc="Retrieving asset metadata")
+    }
+
+    # Build dataset
+    dataset = ObservationDataset(
+        images=[
+            ObservationDataset.Image(
+                file_name=assets_by_id[asset_id].attributes.filename,
+                asset_id=asset_id,
+                sequence_id=img.attributes.sequence,
+                original_filename=img.attributes.original_filename,
+                created_at=img.attributes.created_at,
+                deployment=img.attributes.deployment,
+                project_id=project_id,
+                width=img.attributes.width,
+                height=img.attributes.height,
+            )
+            for asset_id, img in [
+                (pos.attributes.asset, assets_by_id[pos.attributes.asset])
+                for (project_id, pos) in observation_positions_flat
+            ]
+        ],
+        observations=[
+            ObservationDataset.Observation(
+                observation_id=obs.attributes.observation_id,
+                scientific_name=obs.attributes.scientific_name,
+                observation_type=obs.attributes.observation_type,
+                sampling_point=obs.attributes.sampling_point,
+            )
+            for (project_id, obs) in observations
+        ],
+        positions=[
+            ObservationDataset.Position(
+                position_id=pos.id,
+                observation_id=pos.attributes.observation,
+                asset_id=pos.attributes.asset,
+                # Agouti stores positions as relative to 640px width, both x and y and relative to the image width.
+                x=float(pos.attributes.x) * assets_by_id[pos.attributes.asset].attributes.width / 640,
+                y=float(pos.attributes.y) * assets_by_id[pos.attributes.asset].attributes.width / 640,
+            )
+            for (project_id, pos) in observation_positions_flat
+        ],
+    )
+
+    dataset_path = output_path / "observation_positions_dataset.json"
+    print(f"Saving observation positions dataset to {dataset_path}")
+    with open(dataset_path, "w") as f:
+        f.write(dataset.model_dump_json(indent=2))
