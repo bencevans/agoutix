@@ -170,7 +170,7 @@ class Agouti:
     token: str
     user_id: str
 
-    def __init__(self, email: str, password: str, verbose: bool = True) -> None:
+    def __init__(self, email: str, password: str, verbose: bool = False) -> None:
         self.email = email
         self.password = password
         self.verbose = verbose
@@ -236,7 +236,7 @@ class Agouti:
 
     def list_projects(self) -> List[Project]:
         """List projects accessible by the authenticated user."""
-        url = f"https://api.agouti.eu/projects?filter%5Buser%5D={self.user_id}&page%5Blimit%5D=25&page%5Boffset%5D=0"
+        url = f"https://api.agouti.eu/projects?filter%5Buser%5D={self.user_id}&page%5Blimit%5D=100&page%5Boffset%5D=0"
         response = self._make_request(url, ProjectsResponse)
         return response.data
 
@@ -245,7 +245,7 @@ class Agouti:
     ) -> List[Observation]:
         """List observations for a project, optionally filtered by observation type."""
         self._log(f"Listing observations for project {project_id}")
-        url = f"https://api.agouti.eu/observations?filter%5Bcustom-deployments-filter%5D=true&filter%5Bcustom-filter%5D=true&filter%5Bproject%5D={project_id}&page%5Blimit%5D=25&page%5Boffset%5D=0"
+        url = f"https://api.agouti.eu/observations?filter%5Bcustom-deployments-filter%5D=true&filter%5Bcustom-filter%5D=true&filter%5Bproject%5D={project_id}&page%5Blimit%5D=100&page%5Boffset%5D=0"
         if filter_observation_type:
             url += f"&filter%5BobservationType%5D={filter_observation_type}"
         response = self._make_request(url, ObservationsResponse)
