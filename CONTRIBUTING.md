@@ -4,7 +4,7 @@ Contributions are welcome! Please fork the repository and submit a pull request 
 
 ## Development Setup
 
-The project uses [uv](https://docs.astral.sh/uv/) for development and testing. To set up the development environment, ensure you have `uv` installed, then run:
+The project uses [`uv`](https://docs.astral.sh/uv/) for development and testing. To set up the development environment, ensure you have `uv` installed, then run:
 
 ```bash
 # Download the repository

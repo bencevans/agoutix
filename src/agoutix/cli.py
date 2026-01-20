@@ -71,25 +71,26 @@ class ExportCalibrationAnnotation(BaseModel):
     height: str
 
 
-def export_calibration_dataset(agouti: Agouti, project_id: str) -> None:
+def export_calibration_dataset(agouti: Agouti, project_ids: List[str]) -> None:
     # Enumerate deployments
-    deployments = agouti.list_project_deployments(project_id)
-    print(f"Exporting calibration dataset for project {project_id}")
+    for project_id in project_ids:
+        deployments = agouti.list_project_deployments(project_id)
+        print(f"Exporting calibration dataset for project {project_id}")
 
-    annotations = [
-        ExportCalibrationAnnotation(
-            project_id=project_id,
-            deployment_id=deployment.id,
-            calibration_id=calibration.id,
-            asset_id=calibration.attributes.asset,
-            label=calibration.attributes.label,
-            x=calibration.attributes.x,
-            y=calibration.attributes.y,
-            height=calibration.attributes.height,
-        )
-        for deployment in deployments
-        for calibration in agouti.list_deployment_calibrations(deployment.id)
-    ]
+        annotations = [
+            ExportCalibrationAnnotation(
+                project_id=project_id,
+                deployment_id=deployment.id,
+                calibration_id=calibration.id,
+                asset_id=calibration.attributes.asset,
+                label=calibration.attributes.label,
+                x=calibration.attributes.x,
+                y=calibration.attributes.y,
+                height=calibration.attributes.height,
+            )
+            for deployment in deployments
+            for calibration in agouti.list_deployment_calibrations(deployment.id)
+        ]
 
     asset_ids = {calibration.asset_id for calibration in annotations}
     print(f"Total unique assets to download: {len(asset_ids)}")

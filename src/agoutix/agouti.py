@@ -170,7 +170,7 @@ class Agouti:
     token: str
     user_id: str
 
-    def __init__(self, email: str, password: str, verbose: bool = False) -> None:
+    def __init__(self, email: str, password: str, verbose: bool = True) -> None:
         self.email = email
         self.password = password
         self.verbose = verbose
