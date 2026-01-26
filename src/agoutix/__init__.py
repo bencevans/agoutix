@@ -57,6 +57,11 @@ def parse_args():
     export_observation_positions_parser.add_argument(
         "--project-id", required=True, help="Project ID", nargs="+"
     )
+    export_observation_positions_parser.add_argument(
+        "--output-path",
+        required=False,
+        help="Output path for the observation positions dataset",
+    )
 
     return parser.parse_args()
 
@@ -92,7 +97,7 @@ def main() -> None:
         cli.export_calibration_dataset(agouti, args.project_id)
 
     elif args.command == "export-observation-positions":
-        cli.export_observation_positions_dataset(agouti, args.project_id)
+        cli.export_observation_positions_dataset(agouti, args.project_id, Path(args.output_path) if args.output_path else None)
 
     else:
         raise NotImplementedError(f"Command {args.command} not implemented")

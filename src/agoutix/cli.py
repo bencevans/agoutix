@@ -233,15 +233,6 @@ def export_observation_positions_dataset(
     assets_dir_path = output_path / "assets"
     assets_dir_path.mkdir(parents=True, exist_ok=True)
 
-    # Download assets
-    # asset_id_to_filename = {}
-    # for asset_id in tqdm(asset_ids, desc="Downloading assets"):
-    #     content, filename = agouti.get_asset_file(asset_id)
-    #     asset_id_to_filename[asset_id] = filename
-    #     asset_path = assets_dir_path / filename
-    #     with open(asset_path, "wb") as f:
-    #         f.write(content)
-
     assets_by_id = {
         asset_id: agouti.get_asset(asset_id)
         for asset_id in tqdm(asset_ids, desc="Retrieving asset metadata")
@@ -292,3 +283,10 @@ def export_observation_positions_dataset(
     print(f"Saving observation positions dataset to {dataset_path}")
     with open(dataset_path, "w") as f:
         f.write(dataset.model_dump_json(indent=2))
+
+    #  Download assets
+    for asset_id in tqdm(asset_ids, desc="Downloading assets"):
+        content, filename = agouti.get_asset_file(asset_id)
+        asset_path = assets_dir_path / filename
+        with open(asset_path, "wb") as f:
+            f.write(content)
