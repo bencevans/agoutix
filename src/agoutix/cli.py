@@ -96,8 +96,6 @@ def export_calibration_dataset(agouti: Agouti, project_ids: List[str]) -> None:
     asset_ids = {calibration.asset_id for calibration in annotations}
     print(f"Total unique assets to download: {len(asset_ids)}")
 
-    asset_id_to_filename = {}
-
     annotations_by_asset_id = {}
     for calibration in annotations:
         annotations_by_asset_id.setdefault(calibration.asset_id, []).append(calibration)
@@ -272,8 +270,12 @@ def export_observation_positions_dataset(
                 observation_id=pos.attributes.observation,
                 asset_id=pos.attributes.asset,
                 # Agouti stores positions as relative to 640px width, both x and y and relative to the image width.
-                x=float(pos.attributes.x) * assets_by_id[pos.attributes.asset].attributes.width / 640,
-                y=float(pos.attributes.y) * assets_by_id[pos.attributes.asset].attributes.width / 640,
+                x=float(pos.attributes.x)
+                * assets_by_id[pos.attributes.asset].attributes.width
+                / 640,
+                y=float(pos.attributes.y)
+                * assets_by_id[pos.attributes.asset].attributes.width
+                / 640,
             )
             for (project_id, pos) in observation_positions_flat
         ],

@@ -240,7 +240,18 @@ class Agouti:
             next_page_url = parsed_url.url
             self._log(f"Fetching next page: {next_page_url}")
             next_page_response = self._make_request(next_page_url, response_model)
-            parsed_response.data.extend(next_page_response.data)
+            # Ensure both current and next page data are lists before concatenating.
+            if isinstance(parsed_response.data, list):
+                if isinstance(next_page_response.data, list):
+                    parsed_response.data.extend(next_page_response.data)
+                else:
+                    parsed_response.data.append(next_page_response.data)
+            else:
+                # Convert single-item data into a list and combine with next page(s)
+                if isinstance(next_page_response.data, list):
+                    parsed_response.data = [parsed_response.data] + next_page_response.data
+                else:
+                    parsed_response.data = [parsed_response.data, next_page_response.data]
 
         return parsed_response
 
