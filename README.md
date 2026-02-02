@@ -19,7 +19,7 @@ Agoutix makes use of the Agouti API used by the Agouti web application. Agouti n
     - [List Projects](#list-projects)
     - [Export Calibration Dataset](#export-calibration-dataset)
     - [Export Observation Positions](#export-observation-positions)
-  - [Citation](#citation)
+  - [Acknowledgements](#acknowledgements)
   - [License](#license)
 
 ## Features
@@ -218,20 +218,14 @@ The dataset is structured as follows:
   - **x**: X coordinate in pixels (adjusted to actual image dimensions)
   - **y**: Y coordinate in pixels (adjusted to actual image dimensions)
 
-## Citation
+## Acknowledgements
 
-If you use Agoutix in your research, please cite it as follows:
+Thank you to the Agouti Team for creating an excellent platform for camera trap data management and generous support during development and delivery of the NHMP pilot project and broader community.
 
-```
-@software{agoutix,
-  author = {Benjamin C. Evans},
-  title = {Agoutix: A Python package and command-line tool for exporting annotation datasets from Agouti projects},
-  year = {2026},
-  url = {
-    "https://github.com/bencevans/agoutix"
-  },
-}
-```
+This tool was developed by Ben Evans at the Institute of Zoology, ZSL as part of the [NHMP](https://www.nhmp.org.uk/) project.
+
+We would like to thank Natural England which provided the majority of the funds to support the NHMP pilot through the Species Recovery Programme funding stream. People’s Trust for Endangered Species and British Hedgehog Preservation Society also contributed significant funds to enable the pilot project to extend to Wales and Scotland
+
 
 ## License
 
