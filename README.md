@@ -7,7 +7,7 @@ A Python package and command-line tool for exporting annotation datasets from [A
 
 Agoutix is not affiliated with or endorsed by the creators of Agouti. This tool is developed independently to facilitate data export and analysis for users of the Agouti platform.
 
-Agoutix makes use of the Agouti API used by the Agouti web application. This API is not publicly documented, and may change without notice. Use Agoutix at your own risk.
+Agoutix makes use of the Agouti API used by the Agouti web application. Agouti now has a [public API](https://api.agouti.eu/docs/), however Agoutix uses some API calls that aren't documented, and may change without notice. Use Agoutix at your own risk.
 
 **Table of Contents**
 
