@@ -49,7 +49,12 @@ class Observation(BaseModel):
         sampling_point: str = Field(alias="sampling-point")
         samplingpoint_id: str = Field(alias="samplingpoint-id")
         observation_type: Literal[
-            "Empty", "DeploymentCalibration", "SetupPickup", "Unclassified", "Species"
+            "Empty",
+            "DeploymentCalibration",
+            "SetupPickup",
+            "Unclassified",
+            "Species",
+            "Vehicle",
         ] = Field(alias="observation-type")
         sequence_id: str = Field(alias="sequence-id")
         scientific_name: Optional[str] = Field(alias="scientific-name", default=None)
@@ -249,9 +254,14 @@ class Agouti:
             else:
                 # Convert single-item data into a list and combine with next page(s)
                 if isinstance(next_page_response.data, list):
-                    parsed_response.data = [parsed_response.data] + next_page_response.data
+                    parsed_response.data = [
+                        parsed_response.data
+                    ] + next_page_response.data
                 else:
-                    parsed_response.data = [parsed_response.data, next_page_response.data]
+                    parsed_response.data = [
+                        parsed_response.data,
+                        next_page_response.data,
+                    ]
 
         return parsed_response
 
