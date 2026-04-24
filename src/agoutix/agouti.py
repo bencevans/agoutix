@@ -1,6 +1,8 @@
 from furl.furl import furl
+import time
 from typing import Generic, List, Literal, Optional, Type, TypeVar
 from requests import get, post
+from requests.exceptions import RequestException
 from pydantic import BaseModel, Field
 from rich import print
 
@@ -337,20 +339,53 @@ class Agouti:
         assert isinstance(response.data, Asset), "Expected single Asset, got list"
         return response.data
 
-    def get_asset_file(self, asset_id: str) -> tuple[bytes, str]:
-        """Download an asset file."""
+    def get_asset_file(
+        self,
+        asset_id: str,
+        max_retries: int = 3,
+        retry_delay_seconds: float = 1.0,
+    ) -> tuple[bytes, str]:
+        """Download an asset file with retry logic for transient failures."""
         self._log(f"Downloading asset {asset_id}")
         url = f"https://api.agouti.eu/assets/{asset_id}/file"
         headers = {"Authorization": f"Bearer {self.token}"}
-        response = get(url, headers=headers)
-        if response.status_code != 200:
-            error_response = ErrorResponse(**response.json())
-            for error in error_response.errors:
-                print(f"[red]{error.detail}[/red]")
-            raise Exception("API request failed")
 
-        filename = response.headers.get(
-            "Content-Disposition", f"attachment; filename={asset_id}"
-        ).split("filename=")[-1]
+        for attempt in range(max_retries + 1):
+            try:
+                response = get(url, headers=headers)
 
-        return response.content, filename
+                if response.status_code == 200:
+                    filename = response.headers.get(
+                        "Content-Disposition", f"attachment; filename={asset_id}"
+                    ).split("filename=")[-1]
+                    return response.content, filename
+
+                if response.status_code not in {408, 429, 500, 502, 503, 504}:
+                    error_response = ErrorResponse(**response.json())
+                    for error in error_response.errors:
+                        print(f"[red]{error.detail}[/red]")
+                    raise Exception("API request failed")
+
+                if attempt == max_retries:
+                    raise Exception(
+                        f"API request failed after {max_retries + 1} attempts"
+                    )
+
+                print(
+                    f"[yellow]Asset download failed with status {response.status_code}. "
+                    f"Retrying ({attempt + 1}/{max_retries})...[/yellow]"
+                )
+
+            except RequestException as error:
+                if attempt == max_retries:
+                    raise Exception(
+                        f"Asset download failed after {max_retries + 1} attempts"
+                    ) from error
+                print(
+                    f"[yellow]Asset download error: {error}. "
+                    f"Retrying ({attempt + 1}/{max_retries})...[/yellow]"
+                )
+
+            time.sleep(retry_delay_seconds * (2**attempt))
+
+        raise Exception("Asset download failed")
