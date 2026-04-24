@@ -1,7 +1,7 @@
 from furl.furl import furl
 import time
 from typing import Generic, List, Literal, Optional, Type, TypeVar
-from requests import get, post
+from requests import request
 from requests.exceptions import RequestException
 from pydantic import BaseModel, Field
 from rich import print
@@ -219,17 +219,73 @@ class Agouti:
         if self.verbose:
             print(*args)
 
+    def _request_with_retries(
+        self,
+        method: str,
+        url: str,
+        headers: Optional[dict] = None,
+        json: Optional[dict] = None,
+        max_retries: int = 3,
+        retry_delay_seconds: float = 1.0,
+        timeout: tuple[float, float] = (10.0, 60.0),
+        operation_name: str = "Request",
+    ):
+        """Make an HTTP request with retries for transient failures."""
+        retriable_status_codes = {408, 429, 500, 502, 503, 504}
+
+        for attempt in range(max_retries + 1):
+            try:
+                response = request(
+                    method=method,
+                    url=url,
+                    headers=headers,
+                    json=json,
+                    timeout=timeout,
+                )
+            except RequestException as error:
+                if attempt == max_retries:
+                    raise Exception(
+                        f"{operation_name} failed after {max_retries + 1} attempts"
+                    ) from error
+
+                print(
+                    f"[yellow]{operation_name} network error: {error}. "
+                    f"Retrying ({attempt + 1}/{max_retries})...[/yellow]"
+                )
+                time.sleep(retry_delay_seconds * (2**attempt))
+                continue
+
+            if response.status_code in retriable_status_codes:
+                if attempt == max_retries:
+                    return response
+
+                print(
+                    f"[yellow]{operation_name} failed with status {response.status_code}. "
+                    f"Retrying ({attempt + 1}/{max_retries})...[/yellow]"
+                )
+                time.sleep(retry_delay_seconds * (2**attempt))
+                continue
+
+            return response
+
+        raise Exception(f"{operation_name} failed")
+
     def _make_request(
         self, url: str, response_model: Type[ApiResponse[DataType]]
     ) -> ApiResponse[DataType]:
         """Make a GET request to the Agouti API and parse the response."""
         headers = {"Authorization": f"Bearer {self.token}"}
-        response = get(url, headers=headers)
+        response = self._request_with_retries(
+            "GET", url, headers=headers, operation_name="API request"
+        )
 
         if response.status_code != 200:
-            error_response = ErrorResponse(**response.json())
-            for error in error_response.errors:
-                print(f"[red]{error.detail}[/red]")
+            try:
+                error_response = ErrorResponse(**response.json())
+                for error in error_response.errors:
+                    print(f"[red]{error.detail}[/red]")
+            except Exception:
+                print(f"[red]API request failed with status {response.status_code}[/red]")
             raise Exception("API request failed")
 
         parsed_response = response_model(**response.json())
@@ -269,14 +325,21 @@ class Agouti:
 
     def login(self) -> None:
         self._log(f"Logging in as {self.email}")
-        response = post(
+        response = self._request_with_retries(
+            "POST",
             "https://api.agouti.eu/user/login",
             json={"email": self.email, "password": self.password},
+            operation_name="Login request",
         )
 
         if response.status_code != 200:
-            error_response = ErrorResponse(**response.json())
-            raise Exception(f"Login failed: {error_response.errors[0].detail}")
+            try:
+                error_response = ErrorResponse(**response.json())
+                raise Exception(f"Login failed: {error_response.errors[0].detail}")
+            except Exception as error:
+                raise Exception(
+                    f"Login failed with status {response.status_code}"
+                ) from error
 
         login_response = SucessfulLoginResponse(**response.json())
         if not login_response.success:
@@ -350,42 +413,28 @@ class Agouti:
         url = f"https://api.agouti.eu/assets/{asset_id}/file"
         headers = {"Authorization": f"Bearer {self.token}"}
 
-        for attempt in range(max_retries + 1):
+        response = self._request_with_retries(
+            "GET",
+            url,
+            headers=headers,
+            max_retries=max_retries,
+            retry_delay_seconds=retry_delay_seconds,
+            operation_name="Asset download",
+        )
+
+        if response.status_code != 200:
             try:
-                response = get(url, headers=headers)
-
-                if response.status_code == 200:
-                    filename = response.headers.get(
-                        "Content-Disposition", f"attachment; filename={asset_id}"
-                    ).split("filename=")[-1]
-                    return response.content, filename
-
-                if response.status_code not in {408, 429, 500, 502, 503, 504}:
-                    error_response = ErrorResponse(**response.json())
-                    for error in error_response.errors:
-                        print(f"[red]{error.detail}[/red]")
-                    raise Exception("API request failed")
-
-                if attempt == max_retries:
-                    raise Exception(
-                        f"API request failed after {max_retries + 1} attempts"
-                    )
-
+                error_response = ErrorResponse(**response.json())
+                for error in error_response.errors:
+                    print(f"[red]{error.detail}[/red]")
+            except Exception:
                 print(
-                    f"[yellow]Asset download failed with status {response.status_code}. "
-                    f"Retrying ({attempt + 1}/{max_retries})...[/yellow]"
+                    f"[red]Asset download failed with status {response.status_code}[/red]"
                 )
+            raise Exception("API request failed")
 
-            except RequestException as error:
-                if attempt == max_retries:
-                    raise Exception(
-                        f"Asset download failed after {max_retries + 1} attempts"
-                    ) from error
-                print(
-                    f"[yellow]Asset download error: {error}. "
-                    f"Retrying ({attempt + 1}/{max_retries})...[/yellow]"
-                )
+        filename = response.headers.get(
+            "Content-Disposition", f"attachment; filename={asset_id}"
+        ).split("filename=")[-1]
 
-            time.sleep(retry_delay_seconds * (2**attempt))
-
-        raise Exception("Asset download failed")
+        return response.content, filename
