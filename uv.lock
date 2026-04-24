@@ -4,7 +4,7 @@ requires-python = ">=3.12"
 
 [[package]]
 name = "agoutix"
-version = "1.0.1"
+version = "1.0.2"
 source = { editable = "." }
 dependencies = [
     { name = "furl" },
