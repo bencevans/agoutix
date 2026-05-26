@@ -180,6 +180,9 @@ class ApiResponse(BaseModel, Generic[DataType]):
     links: Optional[Links] = None
     data: DataType | List[DataType]
     jsonapi: JsonApiDetails
+    relationships: Optional[dict] = None
+    links: Optional[dict] = None
+    included: Optional[list] = None
 
 
 # Type aliases for specific responses
