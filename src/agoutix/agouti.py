@@ -139,6 +139,16 @@ class Asset(BaseModel):
     attributes: Attributes
 
 
+class Sequence(BaseModel):
+    class Attributes(BaseModel):
+        deployment: str
+        order: int
+
+    type: Literal["sequences"]
+    id: str
+    attributes: Attributes
+
+
 # ============================================================================
 # API Response Models
 # ============================================================================
@@ -194,6 +204,10 @@ class ObservationPositionsResponse(ApiResponse[ObservationPosition]):
 
 
 class AssetsResponse(ApiResponse[Asset]):
+    pass
+
+
+class SequenceResponse(ApiResponse[Sequence]):
     pass
 
 
@@ -285,7 +299,9 @@ class Agouti:
                 for error in error_response.errors:
                     print(f"[red]{error.detail}[/red]")
             except Exception:
-                print(f"[red]API request failed with status {response.status_code}[/red]")
+                print(
+                    f"[red]API request failed with status {response.status_code}[/red]"
+                )
             raise Exception("API request failed")
 
         parsed_response = response_model(**response.json())
@@ -392,6 +408,13 @@ class Agouti:
         """List positions for an observation."""
         url = f"https://api.agouti.eu/observationpositions?filter%5Bobservation%5D={observation_id}"
         response = self._make_request(url, ObservationPositionsResponse)
+        return response.data
+
+    def get_sequence(self, sequence_id: str) -> List[SequenceResponse]:
+        """Get all assets for a sequence."""
+        self._log(f"Fetching assets for sequence {sequence_id}")
+        url = f"https://api.agouti.eu/sequences/{sequence_id}?include=assets%2Cobservations%2Cobservations.createdBy%2Cdeployment"
+        response = self._make_request(url, SequenceResponse)
         return response.data
 
     def get_asset(self, asset_id: str) -> Asset:
