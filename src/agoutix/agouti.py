@@ -139,6 +139,12 @@ class Asset(BaseModel):
     attributes: Attributes
 
 
+class AssetReference(BaseModel):
+    type: Literal["assets"]
+    id: str
+    sequence: str
+
+
 class Sequence(BaseModel):
     class Attributes(BaseModel):
         deployment: str
@@ -211,6 +217,10 @@ class AssetsResponse(ApiResponse[Asset]):
 
 
 class SequenceResponse(ApiResponse[Sequence]):
+    pass
+
+
+class AssetReferenceResponse(ApiResponse[AssetReference]):
     pass
 
 
@@ -411,6 +421,13 @@ class Agouti:
         """List positions for an observation."""
         url = f"https://api.agouti.eu/observationpositions?filter%5Bobservation%5D={observation_id}"
         response = self._make_request(url, ObservationPositionsResponse)
+        return response.data
+
+    def list_favorites(self, project_id: str) -> List[AssetReferenceResponse]:
+        """List favorite assets for a project."""
+        self._log(f"Listing favorite assets for project {project_id}")
+        url = f"https://api.agouti.eu/assets/favorites?filter[project]={project_id}&page%5Blimit%5D=100&page%5Boffset%5D=0"
+        response = self._make_request(url, AssetReferenceResponse)
         return response.data
 
     def get_sequence(self, sequence_id: str) -> List[SequenceResponse]:
