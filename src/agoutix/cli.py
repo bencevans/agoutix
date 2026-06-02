@@ -292,3 +292,42 @@ def export_observation_positions_dataset(
         asset_path = assets_dir_path / filename
         with open(asset_path, "wb") as f:
             f.write(content)
+
+
+def export_camtrapdp_dataset(
+    agouti: Agouti, project_id: str, output_path: Optional[Path] = None
+) -> None:
+    from .public import AgoutiPublicAPI, AuthJWT
+
+    output_path = output_path or Path("export")
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    public_api = AgoutiPublicAPI(AuthJWT(agouti.token))
+
+    print(f"Exporting project {project_id} as CamtrapDP datapackage")
+
+    # datapackage = public_api.export_project_datapackage(project_id)
+    # datapackage_path = output_path / "datapackage.json"
+    # print(f"Saving datapackage to {datapackage_path}")
+    # with open(datapackage_path, "w") as f:
+    #     f.write(datapackage.model_dump_json(indent=2))
+
+    deployments = public_api.export_project_deployments_csv(project_id)
+    deployments_path = output_path / "deployments.csv"
+    print(f"Saving deployments CSV to {deployments_path}")
+    with open(deployments_path, "w") as f:
+        f.write(deployments)
+
+    observations = public_api.export_project_observations_csv(project_id)
+    observations_path = output_path / "observations.csv"
+    print(f"Saving observations CSV to {observations_path}")
+    with open(observations_path, "w") as f:
+        f.write(observations)
+
+    media = public_api.export_project_media_csv(project_id)
+    media_path = output_path / "media.csv"
+    print(f"Saving media CSV to {media_path}")
+    with open(media_path, "w") as f:
+        f.write(media)
+
+    print("Export complete")
