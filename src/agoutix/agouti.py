@@ -57,10 +57,16 @@ class Observation(BaseModel):
             "Unclassified",
             "Species",
             "Vehicle",
+            "Undefined"
         ] = Field(alias="observation-type")
         sequence_id: str = Field(alias="sequence-id")
         scientific_name: Optional[str] = Field(alias="scientific-name", default=None)
         deployment_id: str = Field(alias="deployment-id")
+        created_by_first_name: Optional[str] = Field(alias="created-by-first-name")
+        created_by_last_name : Optional[str] = Field(alias="created-by-last-name")
+        modified_by_first_name: Optional[str] = Field(alias="modified-by-first-name")
+        modified_by_last_name : Optional[str] = Field(alias="modified-by-last-name")
+
 
     type: Literal["cachedobservations"]
     id: str
@@ -387,11 +393,15 @@ class Agouti:
         return response.data
 
     def list_project_observations(
-        self, project_id: str, filter_observation_type: Optional[str] = None
+        self,
+        project_id: str,
+        filter_observation_type: Optional[str] = None,
+        page_limit: int = 100,
+        page_offset: int = 0,
     ) -> List[Observation]:
         """List observations for a project, optionally filtered by observation type."""
         self._log(f"Listing observations for project {project_id}")
-        url = f"https://api.agouti.eu/observations?filter%5Bcustom-deployments-filter%5D=true&filter%5Bcustom-filter%5D=true&filter%5Bproject%5D={project_id}&page%5Blimit%5D=100&page%5Boffset%5D=0"
+        url = f"https://api.agouti.eu/observations?filter%5Bcustom-deployments-filter%5D=true&filter%5Bcustom-filter%5D=true&filter%5Bproject%5D={project_id}&page[limit]={page_limit}&page[offset]={page_offset}"
         if filter_observation_type:
             url += f"&filter%5BobservationType%5D={filter_observation_type}"
         response = self._make_request(url, ObservationsResponse)
