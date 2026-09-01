@@ -237,6 +237,8 @@ class AssetReferenceResponse(ApiResponse[AssetReference]):
 
 
 class Agouti:
+    MAX_RETRY_DURATION_SECONDS = 20 * 60
+
     email: str
     password: str
     token: str
@@ -259,14 +261,22 @@ class Agouti:
         url: str,
         headers: Optional[dict] = None,
         json: Optional[dict] = None,
-        max_retries: int = 3,
         retry_delay_seconds: float = 1.0,
         max_retry_delay_seconds: float = 60.0,
+        max_retry_duration_seconds: Optional[float] = None,
         timeout: tuple[float, float] = (10.0, 60.0),
         operation_name: str = "Request",
     ):
-        """Make an HTTP request with jittered exponential backoff."""
+        """Retry transient failures with backoff until the time budget expires."""
         retriable_status_codes = {408, 429, 500, 502, 503, 504}
+        retry_duration = (
+            self.MAX_RETRY_DURATION_SECONDS
+            if max_retry_duration_seconds is None
+            else max_retry_duration_seconds
+        )
+        if retry_duration < 0:
+            raise ValueError("max_retry_duration_seconds cannot be negative")
+        retry_deadline = time.monotonic() + retry_duration
 
         def backoff_delay(attempt: int, retry_after: Optional[str] = None) -> float:
             exponential_delay = min(
@@ -284,7 +294,8 @@ class Agouti:
 
             return delay
 
-        for attempt in range(max_retries + 1):
+        attempt = 0
+        while True:
             try:
                 response = request(
                     method=method,
@@ -294,29 +305,37 @@ class Agouti:
                     timeout=timeout,
                 )
             except RequestException as error:
-                if attempt == max_retries:
+                remaining_seconds = retry_deadline - time.monotonic()
+                if remaining_seconds <= 0:
                     raise Exception(
-                        f"{operation_name} failed after {max_retries + 1} attempts"
+                        f"{operation_name} failed after retrying for "
+                        f"{retry_duration:g} seconds"
                     ) from error
 
                 print(
                     f"[yellow]{operation_name} network error: {error}. "
-                    f"Retrying ({attempt + 1}/{max_retries})...[/yellow]"
+                    f"Retrying for up to {remaining_seconds:.0f}s...[/yellow]"
                 )
-                time.sleep(backoff_delay(attempt))
+                time.sleep(min(backoff_delay(attempt), remaining_seconds))
+                attempt += 1
                 continue
 
             if response.status_code in retriable_status_codes:
-                if attempt == max_retries:
+                remaining_seconds = retry_deadline - time.monotonic()
+                if remaining_seconds <= 0:
                     return response
 
                 print(
                     f"[yellow]{operation_name} failed with status {response.status_code}. "
-                    f"Retrying ({attempt + 1}/{max_retries})...[/yellow]"
+                    f"Retrying for up to {remaining_seconds:.0f}s...[/yellow]"
                 )
                 time.sleep(
-                    backoff_delay(attempt, response.headers.get("Retry-After"))
+                    min(
+                        backoff_delay(attempt, response.headers.get("Retry-After")),
+                        remaining_seconds,
+                    )
                 )
+                attempt += 1
                 continue
 
             return response
@@ -478,8 +497,8 @@ class Agouti:
     def get_asset_file(
         self,
         asset_id: str,
-        max_retries: int = 3,
         retry_delay_seconds: float = 1.0,
+        max_retry_duration_seconds: Optional[float] = None,
     ) -> tuple[bytes, str]:
         """Download an asset file with retry logic for transient failures."""
         self._log(f"Downloading asset {asset_id}")
@@ -490,8 +509,8 @@ class Agouti:
             "GET",
             url,
             headers=headers,
-            max_retries=max_retries,
             retry_delay_seconds=retry_delay_seconds,
+            max_retry_duration_seconds=max_retry_duration_seconds,
             operation_name="Asset download",
         )
 

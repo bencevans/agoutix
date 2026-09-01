@@ -53,3 +53,26 @@ def test_retry_after_is_respected(monkeypatch):
 
     assert response.status_code == 200
     sleep.assert_called_once_with(10.0)
+
+
+def test_retries_until_configurable_time_budget_expires(monkeypatch):
+    request = Mock(side_effect=requests.RequestException("offline"))
+    sleep = Mock()
+    monotonic = Mock(side_effect=[100, 105, 120])
+    monkeypatch.setattr("agoutix.agouti.request", request)
+    monkeypatch.setattr("agoutix.agouti.time.sleep", sleep)
+    monkeypatch.setattr("agoutix.agouti.time.monotonic", monotonic)
+    monkeypatch.setattr("agoutix.agouti.random.uniform", Mock(return_value=60))
+
+    client = client_without_login()
+    client.MAX_RETRY_DURATION_SECONDS = 20
+
+    try:
+        client._request_with_retries("GET", "https://example.test")
+    except Exception as error:
+        assert str(error) == "Request failed after retrying for 20 seconds"
+    else:
+        raise AssertionError("Expected the retry time budget to expire")
+
+    assert request.call_count == 2
+    sleep.assert_called_once_with(15)
