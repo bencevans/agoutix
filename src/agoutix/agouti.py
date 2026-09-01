@@ -1,4 +1,5 @@
 from furl.furl import furl
+import random
 import time
 from typing import Generic, List, Literal, Optional, Type, TypeVar
 from requests import request
@@ -260,11 +261,28 @@ class Agouti:
         json: Optional[dict] = None,
         max_retries: int = 3,
         retry_delay_seconds: float = 1.0,
+        max_retry_delay_seconds: float = 60.0,
         timeout: tuple[float, float] = (10.0, 60.0),
         operation_name: str = "Request",
     ):
-        """Make an HTTP request with retries for transient failures."""
+        """Make an HTTP request with jittered exponential backoff."""
         retriable_status_codes = {408, 429, 500, 502, 503, 504}
+
+        def backoff_delay(attempt: int, retry_after: Optional[str] = None) -> float:
+            exponential_delay = min(
+                retry_delay_seconds * (2**attempt), max_retry_delay_seconds
+            )
+            delay = random.uniform(0, exponential_delay)
+
+            if retry_after is not None:
+                try:
+                    delay = max(delay, float(retry_after))
+                except ValueError:
+                    # HTTP-date Retry-After values are uncommon here; fall back to
+                    # jittered exponential backoff if the value is not numeric.
+                    pass
+
+            return delay
 
         for attempt in range(max_retries + 1):
             try:
@@ -285,7 +303,7 @@ class Agouti:
                     f"[yellow]{operation_name} network error: {error}. "
                     f"Retrying ({attempt + 1}/{max_retries})...[/yellow]"
                 )
-                time.sleep(retry_delay_seconds * (2**attempt))
+                time.sleep(backoff_delay(attempt))
                 continue
 
             if response.status_code in retriable_status_codes:
@@ -296,7 +314,9 @@ class Agouti:
                     f"[yellow]{operation_name} failed with status {response.status_code}. "
                     f"Retrying ({attempt + 1}/{max_retries})...[/yellow]"
                 )
-                time.sleep(retry_delay_seconds * (2**attempt))
+                time.sleep(
+                    backoff_delay(attempt, response.headers.get("Retry-After"))
+                )
                 continue
 
             return response
