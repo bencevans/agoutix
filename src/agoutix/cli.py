@@ -1,10 +1,37 @@
 import agoutix
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Callable, Iterable, List, Optional, Tuple, TypeVar
 from rich import print
 from agoutix.agouti import Agouti
 from pydantic import BaseModel
 from tqdm import tqdm
+
+
+T = TypeVar("T")
+R = TypeVar("R")
+
+
+def _parallel_map(
+    function: Callable[[T], R],
+    items: Iterable[T],
+    *,
+    workers: int,
+    description: str,
+) -> List[R]:
+    """Apply an I/O-bound operation concurrently while preserving input order."""
+    item_list = list(items)
+    if not item_list:
+        return []
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        return list(
+            tqdm(
+                executor.map(function, item_list),
+                total=len(item_list),
+                desc=description,
+            )
+        )
 
 
 def list_projects(agouti: Agouti) -> None:
@@ -189,7 +216,11 @@ def export_observation_positions_dataset(
     agouti: Agouti,
     project_ids: List[str],
     output_path: Optional[Path] = None,
+    workers: int = 8,
 ) -> None:
+    if workers < 1:
+        raise ValueError("workers must be at least 1")
+
     output_path = output_path or Path(".")
 
     observations: List[Tuple[str, agoutix.agouti.Observation]] = []
@@ -207,13 +238,21 @@ def export_observation_positions_dataset(
     print(f"Total observations found: {len(observations)}")
 
     # Enumerate Observation Positions
-    observation_positions = [
-        (project_id, agouti.list_observation_positions(obs.attributes.observation_id))
-        for project_id, obs in tqdm(
-            observations, desc="Collecting observation positions"
-        )
-        if obs.attributes.observation_type == "Species"
-    ]
+    def get_observation_positions(
+        project_observation: Tuple[str, agoutix.agouti.Observation],
+    ):
+        project_id, observation = project_observation
+        observation_id = observation.attributes.observation_id
+        if observation_id is None:
+            return project_id, []
+        return project_id, agouti.list_observation_positions(observation_id)
+
+    observation_positions = _parallel_map(
+        get_observation_positions,
+        observations,
+        workers=workers,
+        description="Collecting observation positions",
+    )
 
     observation_positions_flat = [
         (project_id, pos)
@@ -222,19 +261,24 @@ def export_observation_positions_dataset(
     ]
     print(f"Total observation positions found: {len(observation_positions_flat)}")
 
-    asset_ids = {
-        pos.attributes.asset for (project_id, pos) in observation_positions_flat
+    asset_project_ids = {
+        pos.attributes.asset: project_id
+        for project_id, pos in observation_positions_flat
     }
+    asset_ids = list(asset_project_ids)
     print(f"Total unique assets to download: {len(asset_ids)}")
 
     # Create assets directory
     assets_dir_path = output_path / "assets"
     assets_dir_path.mkdir(parents=True, exist_ok=True)
 
-    assets_by_id = {
-        asset_id: agouti.get_asset(asset_id)
-        for asset_id in tqdm(asset_ids, desc="Retrieving asset metadata")
-    }
+    assets = _parallel_map(
+        agouti.get_asset,
+        asset_ids,
+        workers=workers,
+        description="Retrieving asset metadata",
+    )
+    assets_by_id = dict(zip(asset_ids, assets))
 
     # Build dataset
     dataset = ObservationDataset(
@@ -250,9 +294,9 @@ def export_observation_positions_dataset(
                 width=img.attributes.width,
                 height=img.attributes.height,
             )
-            for asset_id, img in [
-                (pos.attributes.asset, assets_by_id[pos.attributes.asset])
-                for (project_id, pos) in observation_positions_flat
+            for asset_id in asset_ids
+            for img, project_id in [
+                (assets_by_id[asset_id], asset_project_ids[asset_id])
             ]
         ],
         observations=[
@@ -286,12 +330,18 @@ def export_observation_positions_dataset(
     with open(dataset_path, "w") as f:
         f.write(dataset.model_dump_json(indent=2))
 
-    #  Download assets
-    for asset_id in tqdm(asset_ids, desc="Downloading assets"):
+    def download_asset_file(asset_id: str) -> None:
         content, filename = agouti.get_asset_file(asset_id)
         asset_path = assets_dir_path / filename
         with open(asset_path, "wb") as f:
             f.write(content)
+
+    _parallel_map(
+        download_asset_file,
+        asset_ids,
+        workers=workers,
+        description="Downloading assets",
+    )
 
 
 def export_camtrapdp_dataset(

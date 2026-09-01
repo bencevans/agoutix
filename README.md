@@ -159,6 +159,9 @@ agoutix --email YOUR_EMAIL --password YOUR_PASSWORD export-observation-positions
 ```
 
 A JSON formatted file named `observation_positions_dataset.json` will be created in the current directory, and all image assets will be downloaded to the `assets/` subdirectory.
+Position lookups, asset metadata requests, and downloads run concurrently. Use
+`--workers N` to tune concurrency (the default is 8); reduce it if the API starts
+rate-limiting requests.
 
 ```json
 {

@@ -62,6 +62,12 @@ def parse_args():
         required=False,
         help="Output path for the observation positions dataset",
     )
+    export_observation_positions_parser.add_argument(
+        "--workers",
+        type=int,
+        default=8,
+        help="Number of concurrent API requests (default: 8)",
+    )
 
     export_camtrapdp_parser = subparsers.add_parser(
         "export-camtrapdp",
@@ -110,7 +116,12 @@ def main() -> None:
         cli.export_calibration_dataset(agouti, args.project_id)
 
     elif args.command == "export-observation-positions":
-        cli.export_observation_positions_dataset(agouti, args.project_id, Path(args.output_path) if args.output_path else None)
+        cli.export_observation_positions_dataset(
+            agouti,
+            args.project_id,
+            Path(args.output_path) if args.output_path else None,
+            workers=args.workers,
+        )
 
     elif args.command == "export-camtrapdp":
         cli.export_camtrapdp_dataset(agouti, args.project_id, Path(args.output_path) if args.output_path else None)
